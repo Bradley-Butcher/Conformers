@@ -7,7 +7,7 @@ Please excuse the state of the current code - I'll clean it up I promise!
 
 ## Status
 
-- [ ] Initial implementation
+- [ ] Initial implementation done
 - [ ] Tests
 - [ ] Pareto Testing procedure (Rather than the current grid search + Bonferroni combo)
 - [ ] Component selection
