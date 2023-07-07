@@ -10,6 +10,7 @@ Please excuse the state of the current code - I'll clean it up I promise!
 - [ ] Initial implementation
 - [ ] Tests
 - [ ] Pareto Testing procedure (Rather than the current grid search + Bonferroni combo)
+- [ ] Component selection
 - [ ] PyPI package
 - [ ] Experiments
 
