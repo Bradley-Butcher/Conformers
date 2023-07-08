@@ -1,1 +1,1 @@
-from conformer.conform import Calibrator, Sampler
+from conformer.conform import Estimator, Sampler
