@@ -1,9 +1,14 @@
 """A script containing a few preset admission functions."""
+from conformer.components.shared import ComponentBase
+from random import random
 
-def debug_admission_function(x, y):
+
+def random_admission(x, y):
     """
     A simple admission function that has a breakpoint to investigate
     the states.
     """
-    breakpoint()
-    return True
+    return random()
+
+class AdmissionFunction(ComponentBase):
+    random: callable = random_admission

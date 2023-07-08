@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-
+from conformer.components.shared import ComponentBase
 
 def bonferroni_correction(p_value: float, n_tests: int) -> float:
     """
@@ -14,19 +13,5 @@ def bonferroni_correction(p_value: float, n_tests: int) -> float:
     """
     return min(1, n_tests * p_value)
 
-def debug_fwer_function(x, y):
-    """
-    A simple admission function that has a breakpoint to investigate
-    the states.
-    """
-    breakpoint()
-    return True
-
-
-class GroupConfidenceFunction(dataclass):
+class GroupConfidenceFunction(ComponentBase):
     bonferroni_correction: callable = bonferroni_correction
-    debug: callable = debug_fwer_function
-
-    @property
-    def list(self):
-        return list(self.__dict__.keys())

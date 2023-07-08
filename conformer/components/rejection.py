@@ -4,15 +4,17 @@ import torch
 
 from conformer.components.shared import ComponentBase
 
+from random import random
 
-def reject_10(x: str, y: dict, lambdas: torch.tensor):
+
+def random_reject(x: str, y: dict, l: torch.tensor):
     """
     A simple admission function that has a breakpoint to investigate
     the states.
     """
-    if len(x) < 10:
-        return True
-    return False
+    seed = sum([int(c) for c in x])
+    random.seed(seed)
+    return random() > l
 
 class RejectionFunction(ComponentBase):
-    reject_10: callable = reject_10
+    random: callable = random_reject

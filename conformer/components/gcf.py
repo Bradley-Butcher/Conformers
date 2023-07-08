@@ -1,19 +1,15 @@
 """A script containing a few preset group confidence functions."""
 
-from dataclasses import dataclass
+from conformer.components.shared import ComponentBase
 
-def debug_gf_function(x, y):
+from random import random
+
+def random_gc(x, y):
     """
     A simple admission function that has a breakpoint to investigate
     the states.
     """
-    breakpoint()
-    return True
+    return random()
 
-
-class GroupConfidenceFunction(dataclass):
-    debug: callable = debug_gf_function
-
-    @property
-    def list(self):
-        return list(self.__dict__.keys())
+class GroupConfidenceFunction(ComponentBase):
+    random: callable = random_gc
