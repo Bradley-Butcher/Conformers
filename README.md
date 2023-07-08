@@ -30,8 +30,15 @@ Potentially some quite interesting combinations with the recent CFG language mod
 Below is an example with GPT2.
 
 ```python
-from conformer import Calibrator, Sampler
-from conformer.fwer import bonferroni_correction
+from conformer import Calibrator, Sampler, Components
+import torch
+from random import randint
+
+
+x =[
+    "What is the capital of France?",
+    "Which prime-minster of the UK was the biggest twat?",
+] 
 
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
@@ -46,18 +53,20 @@ calibrator = Calibrator(
     calibration_prompts=x,
 )
 
-def test_rejection(x, y, l):
-    return len(x) < l
-
-calibrator.set_admission_function(lambda x, y:  randint(0, 3) == 0)
-calibrator.set_group_confidence_function(lambda x: len(x), torch.tensor([0.1, 0.5, 1]))
-calibrator.add_rejection_function(lambda x, y, l: len(x) > l, torch.tensor([1, 2, 5]))
-calibrator.add_rejection_function(test_rejection, torch.tensor([0.1, 0.5, 1]))
-calibrator.set_FWER(bonferroni_correction)
+calibrator.set_admission_function(Components.admission.debug)
+calibrator.set_group_confidence_function(Components.group_confidence.debug, torch.tensor([0.1, 0.5, 1]))
+calibrator.add_rejection_function(Components.rejection.debug, torch.tensor([0.1, 0.5, 1]))
+calibrator.set_FWER(Components.FWER.debug)
 
 lambdaz = calibrator.search()
 
 sampler = Sampler.from_calibrator(calibrator)
 
 sampler.sample_with_rejection("What is the capital of France?")
+```
+
+This uses some of the built-in admission/gf/fwer/rejection functions. Can also just use your own function, e.g.:
+
+```python
+calibrator.set_group_confidence_function(lambda x: x > 0.5, torch.tensor([0.1, 0.5, 1]))
 ```
