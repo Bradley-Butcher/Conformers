@@ -13,5 +13,5 @@ def bonferroni_correction(p_value: float, n_tests: int) -> float:
     """
     return min(1, n_tests * p_value)
 
-class GroupConfidenceFunction(ComponentBase):
+class FWERFunction(ComponentBase):
     bonferroni_correction: callable = bonferroni_correction

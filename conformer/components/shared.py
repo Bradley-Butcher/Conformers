@@ -9,7 +9,8 @@ def debug_func(*args, **kwargs):
     breakpoint()
     return True
 
-class ComponentBase(dataclass):
+@dataclass
+class ComponentBase:
     debug: callable = debug_func
 
     @property

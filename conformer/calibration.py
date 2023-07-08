@@ -58,8 +58,8 @@ class Calibrator(ConformerBase):
                 precomputed.extend([{
                     "prompt": prompt,
                     "response": self.tokenizer.decode(output.sequences[i], skip_special_tokens=True),
-                    "sequence_prob": output.sequences_scores[i],
-                    "transition_scores": transition_scores[i],
+                    "sequence_prob": output.sequences_scores[i].detach().cpu(),
+                    "transition_scores": transition_scores[i].detach().cpu(),
                 } for i in range(output.sequences.size(0))])
         return precomputed
 
@@ -76,7 +76,7 @@ class Calibrator(ConformerBase):
             y_k = self.calib_output[x * self.samples_per_prompt + i]
             for reject_func in self.rejection_functions:
                 lambda_idx = self.func_lambda_map[reject_func.__name__]
-                if reject_func(self.calibration_prompts[x], y_k, self.lambda_vector[lambda_idx]):
+                if reject_func(x=self.calibration_prompts[x], y=y_k, l=lambda_vector[lambda_idx]):
                     break
             if result.S_star < 0:
                 result.S_star = i + 1
