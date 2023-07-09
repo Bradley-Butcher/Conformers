@@ -6,7 +6,7 @@ from conformer.components.fwer import FWERFunction
 
 @dataclass
 class Components:
-    rejection: RejectionFunction = RejectionFunction()
-    admission: AdmissionFunction = AdmissionFunction()
-    group_confidence: GroupConfidenceFunction = GroupConfidenceFunction()
-    FWER: FWERFunction = FWERFunction()
+    rejection: RejectionFunction = RejectionFunction
+    admission: AdmissionFunction = AdmissionFunction
+    group_confidence: GroupConfidenceFunction = GroupConfidenceFunction
+    FWER: FWERFunction = FWERFunction

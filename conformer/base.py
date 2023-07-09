@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from functools import partial
 import itertools
-from typing import Callable, Tuple, List
+from typing import Callable, Optional, Tuple, List
 
 from typing import List, Tuple
 import transformers
@@ -10,6 +11,16 @@ from loguru import logger
 from typing import List, Tuple
 
 __all__ = ["SWRResult", "ResultStore", "LambdaGrid", "ConformerBase"]
+
+
+@dataclass
+class CElement:
+    prompt: str
+    prompt_tokens: torch.tensor
+    response: str
+    response_tokens: torch.tensor
+    sequence_score: float
+    transition_scores: float
 
 @dataclass
 class SWRResult:
@@ -104,7 +115,10 @@ class ConformerBase:
     Also includes functions for conformity measures.
     """
 
-    def __init__(self, model: transformers.PreTrainedModel, tokenizer: transformers.PreTrainedTokenizer):
+    def __init__(
+            self, 
+            model: transformers.PreTrainedModel, 
+            tokenizer: transformers.PreTrainedTokenizer):
         """
         Initialize with a model and tokenizer.
         """
@@ -119,13 +133,21 @@ class ConformerBase:
         self.lambda_vals = []
         self.func_lambda_map = {}
 
-    def set_admission_function(self, func: Callable) -> None:
+    def set_admission_function(
+        self, 
+        func: Callable,
+        threshold: Optional[float] = None,
+                               
+    ) -> None:
         """
         Set the admission function for Conformer.
         """
         if self.admission_function is not None:
             logger.warning("Overwriting admission function.")
-        self.admission_function = func
+        if threshold is not None:
+            self.admission_function = partial(func, threshold=threshold)
+        else:
+            self.admission_function = func
 
     def set_group_confidence_function(self, func: Callable, lambda_vals: torch.tensor) -> None:
         """

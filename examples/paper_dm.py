@@ -32,27 +32,27 @@ group_conf_lambdas = torch.tensor([0.1, 0.5, 1])
 rejection_lambdas = torch.tensor([0.1, 0.5, 1])
 
 calibrator.set_admission_function(
-    func=Components.admission.debug,
+    func=Components.admission.rouge_1, 
     threshold=0.4
 )
 
 calibrator.set_group_confidence_function(
-    Components.group_confidence.debug, 
+    Components.group_confidence.sum_ngll, 
     group_conf_lambdas
 )
 
 calibrator.add_rejection_function(
-    Components.rejection.debug, 
+    Components.rejection.rouge_1, 
     rejection_lambdas
 )
 
 calibrator.add_rejection_function(
-    Components.rejection.debug, 
+    Components.rejection.ngll, 
     rejection_lambdas
 )
 
 calibrator.set_FWER(
-    fwer_algorithm=Components.FWER.debug
+    fwer_algorithm=Components.FWER.bonferroni_correction
 )
 
 lambdaz = calibrator.search()

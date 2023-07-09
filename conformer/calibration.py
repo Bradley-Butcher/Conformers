@@ -1,10 +1,12 @@
+from functools import partial
 from scipy.stats import binom
-from typing import Callable, List
+from typing import Callable, List, Optional
 import transformers
 import torch
 from loguru import logger
 from tqdm import tqdm
 from conformer.base import *
+from conformer.base import CElement
 
 class Calibrator(ConformerBase):
     def __init__(
@@ -12,6 +14,9 @@ class Calibrator(ConformerBase):
         model: transformers.PreTrainedModel,
         tokenizer: transformers.PreTrainedTokenizer,
         calibration_prompts: List[str],
+        calibration_targets: Optional[List[str]] = None,
+        max_calibration_input_length: int = 128,
+        max_calibration_output_length: int = 256,
         samples_per_prompt: int = 5,
         delta: float = 0.05,
         epsilon: float = 0.05,
@@ -22,16 +27,24 @@ class Calibrator(ConformerBase):
         self.delta = delta
         self.epsilon = epsilon
         self.calibration_prompts = calibration_prompts
+        self.calibration_targets = calibration_targets
         self.rho1 = rho1
         self.rho2 = rho2
         self.samples_per_prompt = samples_per_prompt
 
+        self.max_calibration_output_length = max_calibration_output_length
+
+        self.tok_func = partial(self.tokenizer, return_tensors="pt", padding=True, truncation=True, max_length=max_calibration_input_length)
+        self.calibration_targets = [
+            {"text": c_t, "tokens": self.tok_func(c_t)}
+            for c_t in self.calibration_targets
+        ] if calibration_targets else None
         logger.info(f"Initialized Conformer with delta={delta} and epsilon={epsilon}.")
         logger.info(f"Precomputing {len(calibration_prompts)} calibration prompts.")
         
         # Caching: Store lambda results in class instance
         self.lambda_results = ResultStore()
-        self.calib_output = self._precompute_calibration()
+        self.calib_store = self._precompute_calibration()
 
     def set_FWER(self, fwer_algorithm: Callable):
         self.fwer_algorithm = fwer_algorithm
@@ -44,57 +57,83 @@ class Calibrator(ConformerBase):
         p_val = self._binomial_pval(e_risk, len(self.calibration_prompts))
         return self.fwer_algorithm(p_val, len(lambda_val)) <= self.delta
 
-    def _precompute_calibration(self, max_length: int = 50) -> List[dict]:
-        precomputed = []
+    def _precompute_calibration(self) -> List[dict]:
+        precomputed = {}
         logger.info("Calculating calibration set.")
         self.model.eval()
         with torch.no_grad():
             for prompt in tqdm(self.calibration_prompts, desc="Precomputing calibration set."):
-                x = self.tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=max_length).to(self.model.device)
-                output = self.model.generate(**x, num_beams=self.samples_per_prompt, num_return_sequences=self.samples_per_prompt, max_length=max_length, return_dict_in_generate=True, output_scores=True, early_stopping=True)
-                transition_scores = self.model.compute_transition_scores(
-                    output.sequences, output.scores, output.beam_indices, normalize_logits=False
+                x = self.tok_func(prompt).to(self.model.device)
+                output = self.model.generate(
+                    **x, 
+                    num_beams=self.samples_per_prompt, 
+                    num_return_sequences=self.samples_per_prompt, 
+                    max_length=self.max_calibration_output_length, 
+                    return_dict_in_generate=True, 
+                    output_scores=True, 
+                    early_stopping=True
                 )
-                precomputed.extend([{
-                    "prompt": prompt,
-                    "response": self.tokenizer.decode(output.sequences[i], skip_special_tokens=True),
-                    "sequence_prob": output.sequences_scores[i].detach().cpu(),
-                    "transition_scores": transition_scores[i].detach().cpu(),
-                } for i in range(output.sequences.size(0))])
+                transition_scores = self.model.compute_transition_scores(
+                    output.sequences, 
+                    output.scores, 
+                    output.beam_indices, 
+                    normalize_logits=False
+                )
+                precomputed[prompt] = [
+                    CElement(
+                        prompt=prompt,
+                        prompt_tokens=x.input_ids[0].detach().cpu(),
+                        response=self.tokenizer.decode(output.sequences[i], skip_special_tokens=True),
+                        sequence_score=output.sequences_scores[i].detach().cpu(),
+                        transition_scores=transition_scores[i].detach().cpu(),
+                        response_tokens=output.sequences[i].detach().cpu(),
+                    ) for i in range(output.sequences.size(0))]
         return precomputed
 
-    def _sample_with_rejection(self, x: int, lambda_vector: torch.Tensor) -> List[dict]:
+    def _sample_with_rejection(self, prompt: str, lambda_vector: torch.Tensor) -> List[dict]:
         assert self.rejection_functions is not None, "Quality estimator function not set."
         assert self.group_confidence_function is not None, "Group confidence function not set."
 
         result = SWRResult()
         result.S = self.samples_per_prompt
-        C_lambda = []
+        C_set = []
 
         group_conf_idx = self.func_lambda_map[self.group_confidence_function.__name__]
         for i in range(self.samples_per_prompt):
-            y_k = self.calib_output[x * self.samples_per_prompt + i]
+            y_k = self.calib_store[prompt][i]
             for reject_func in self.rejection_functions:
                 lambda_idx = self.func_lambda_map[reject_func.__name__]
-                if reject_func(x=self.calibration_prompts[x], y=y_k, l=lambda_vector[lambda_idx]):
-                    break
+                try:
+                    if reject_func(x=prompt, y=y_k, c=C_set, l=lambda_vector[lambda_idx]):
+                        break
+                except TypeError:
+                    raise TypeError(f"Quality estimator function {reject_func.__name__} must take the form f(x, y, c, lambda)")
             if result.S_star < 0:
                 result.S_star = i + 1
-            C_lambda.append(y_k)
-            if self.group_confidence_function(C_lambda) > lambda_vector[group_conf_idx]:
-                result.S = i + 1
-                break
-        result.S = len(C_lambda)
+            C_set.append(y_k)
+            try:
+                if self.group_confidence_function(prompt, C_set, lambda_vector[group_conf_idx]):
+                    result.S = i + 1
+                    break
+            except TypeError:
+                raise TypeError(f"Group confidence function {self.group_confidence_function.__name__} must take the form f(prompt, C_set, lambda)")
+        result.S = len(C_set)
         self.lambda_results.add_result(lambda_vector, result)
-        return C_lambda
+        return C_set
 
     def _empirical_risk(self, lambda_vector: torch.Tensor) -> torch.Tensor:
         assert self.admission_function is not None, "Admission function not set."
         n = len(self.calibration_prompts)
         losses = torch.zeros(n)
-        for x_idx in range(n):
-            C_set = self._sample_with_rejection(x_idx, lambda_vector)
-            losses[x_idx] = int(any(self.admission_function(self.calibration_prompts[x_idx], C_i) for C_i in C_set))
+        for i, prompt in enumerate(self.calibration_prompts):
+            C_set = self._sample_with_rejection(prompt, lambda_vector)
+            losses[i] = int(any(self.admission_function(
+                self.calibration_prompts[i], 
+                C_i, 
+                self.calibration_targets[i]) 
+                for C_i in C_set
+                )
+            )
         return losses.mean()
 
     def search(self):
