@@ -37,7 +37,7 @@ from random import randint
 
 x =[
     "What is the capital of France?",
-    "Which prime-minster of the UK was the biggest twat?",
+    "Which prime-minster of the UK was the biggest nob?",
 ] 
 
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
