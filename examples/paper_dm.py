@@ -14,12 +14,14 @@ y = [
     "The biggest twat of a prime-minister was Boris Johnson."
 ]
 
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import GPTNeoXForCausalLM, AutoTokenizer
 
-model_name = "gpt2"
-model = GPT2LMHeadModel.from_pretrained(model_name)
-tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-tokenizer.pad_token_id = tokenizer.eos_token_id
+model_name = "EleutherAI/pythia-1b"
+model = GPTNeoXForCausalLM.from_pretrained(
+    model_name,
+)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+# tokenizer.pad_token_id = tokenizer.eos_token_id
 
 calibrator = Calibrator(
     model=model,

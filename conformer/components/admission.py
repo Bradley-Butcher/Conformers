@@ -3,7 +3,7 @@ from conformer.components.shared import ComponentBase
 from random import random
 
 def rouge_1_score(x: str, c: list, target: dict, threshold: float):
-    reference_tokens = set(y.response_tokens.tolist())
+    reference_tokens = set(c.response_tokens.tolist())
     target_tokens = set(target.response_tokens.tolist())
     shared_tokens = reference_tokens.intersection(target_tokens)
     return (len(shared_tokens) / len(reference_tokens)) >= threshold
