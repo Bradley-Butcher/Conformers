@@ -19,7 +19,7 @@ def rouge_1_score(x: str, y: CElement, c: list, l: torch.tensor):
     return max_rouge >= l
 
 def ngll_score(x: str, y: CElement, c: list, l: torch.tensor):
-    return y.sequence_score <= l
+    return -y.sequence_score >= l
 
 def random_reject(x: str, y: CElement, c: list, l: torch.tensor):
     """

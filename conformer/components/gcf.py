@@ -25,14 +25,14 @@ def max_ngll(x: str, c: list, l: torch.tensor):
     A simple admission function that has a breakpoint to investigate
     the states.
     """
-    return max([ci.sequence_score for ci in c]) <= l
+    return max([-ci.sequence_score for ci in c]) >= l
 
 def sum_ngll(x: str, c: list, l: torch.tensor):
     """
     A simple admission function that has a breakpoint to investigate
     the states.
     """
-    return sum([ci.sequence_score for ci in c]) <= l
+    return sum([-ci.sequence_score for ci in c]) >= l
 
 class GroupConfidenceFunction(ComponentBase):
     random: callable = random_gc

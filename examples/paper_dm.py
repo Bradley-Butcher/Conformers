@@ -2,26 +2,25 @@
 from conformer import Calibrator, Sampler, Components
 import torch
 from random import randint
+from transformers import LlamaTokenizer, LlamaForCausalLM
+from datasets import load_dataset
 
 
-x =[
-    "What is the capital of France?",
-    "Which prime-minster of the UK was the biggest twat?",
-]
+dataset = load_dataset("cnn_dailymail", "3.0.0")
 
-y = [
-    "The capital of France is Paris",
-    "The biggest twat of a prime-minister was Boris Johnson."
-]
+x = dataset["train"][:5]["article"]
 
-from transformers import GPTNeoXForCausalLM, AutoTokenizer
+# Append to each x ". Summary: "
+x = [x_i[:] + ". Summary: " for x_i in x]
+y = dataset["train"][:5]["highlights"]
 
-model_name = "EleutherAI/pythia-1b"
-model = GPTNeoXForCausalLM.from_pretrained(
+model_name = "psmathur/orca_mini_3b"
+model = LlamaForCausalLM.from_pretrained(
     model_name,
-)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-# tokenizer.pad_token_id = tokenizer.eos_token_id
+    torch_dtype=torch.bfloat16
+).cuda()
+tokenizer = LlamaTokenizer.from_pretrained(model_name)
+tokenizer.pad_token_id = tokenizer.eos_token_id
 
 calibrator = Calibrator(
     model=model,
@@ -30,8 +29,9 @@ calibrator = Calibrator(
     calibration_targets=y
 )
 
-group_conf_lambdas = torch.tensor([0.1, 0.5, 1])
-rejection_lambdas = torch.tensor([0.1, 0.5, 1])
+group_conf_lambdas = torch.tensor([0.2, 0.4, 0.6, 0.8, 1])
+nll_rej_lambdas = torch.tensor([0.05, 0.1, 0.2, 0.3, 0.4, 0.5])
+rouge_rej_lambdas = torch.tensor([0.2, 0.4, 0.6, 0.8, 0.9])
 
 calibrator.set_admission_function(
     func=Components.admission.rouge_1, 
@@ -45,12 +45,12 @@ calibrator.set_group_confidence_function(
 
 calibrator.add_rejection_function(
     Components.rejection.rouge_1, 
-    rejection_lambdas
+    rouge_rej_lambdas
 )
 
 calibrator.add_rejection_function(
     Components.rejection.ngll, 
-    rejection_lambdas
+    nll_rej_lambdas
 )
 
 calibrator.set_FWER(
@@ -59,6 +59,7 @@ calibrator.set_FWER(
 
 lambdaz = calibrator.search()
 
+breakpoint()
 
 # sampler = Sampler.from_calibrator(calibrator)
 

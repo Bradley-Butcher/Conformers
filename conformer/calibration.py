@@ -1,4 +1,5 @@
 from functools import partial
+import pickle
 from scipy.stats import binom
 from typing import Callable, List, Optional
 import transformers
@@ -14,10 +15,11 @@ class Calibrator(ConformerBase):
         model: transformers.PreTrainedModel,
         tokenizer: transformers.PreTrainedTokenizer,
         calibration_prompts: List[str],
+        calibration_path: Optional[str] = None,
         calibration_targets: Optional[List[str]] = None,
-        max_calibration_input_length: int = 128,
+        max_calibration_input_length: int = 1024,
         max_calibration_output_length: int = 256,
-        samples_per_prompt: int = 5,
+        samples_per_prompt: int = 3,
         delta: float = 0.05,
         epsilon: float = 0.05,
         rho1: float = 0.5,
@@ -36,7 +38,7 @@ class Calibrator(ConformerBase):
 
         self.tok_func = partial(self.tokenizer, return_tensors="pt", padding=True, truncation=True, max_length=max_calibration_input_length)
         self.calibration_targets = [
-            {"text": c_t, "tokens": self.tok_func(c_t)}
+            {"text": c_t, "tokens": self.tok_func(c_t)["input_ids"][0]}
             for c_t in self.calibration_targets
         ] if calibration_targets else None
         logger.info(f"Initialized Conformer with delta={delta} and epsilon={epsilon}.")
@@ -44,7 +46,16 @@ class Calibrator(ConformerBase):
         
         # Caching: Store lambda results in class instance
         self.lambda_results = ResultStore()
-        self.calib_store = self._precompute_calibration()
+        if calibration_path:
+            with open(calibration_path, "rb") as f:
+                self.calib_store = pickle.load(f)
+        else:
+            self.calib_store = self._precompute_calibration()
+
+    def save_calibration(self, path: str):
+        with open(path, "wb") as f:
+            pickle.dump(self.calib_store, f)
+
 
     def set_FWER(self, fwer_algorithm: Callable):
         self.fwer_algorithm = fwer_algorithm
@@ -66,12 +77,11 @@ class Calibrator(ConformerBase):
                 x = self.tok_func(prompt).to(self.model.device)
                 output = self.model.generate(
                     **x, 
-                    num_beams=self.samples_per_prompt, 
+                    num_beams=self.samples_per_prompt,
                     num_return_sequences=self.samples_per_prompt, 
-                    max_length=self.max_calibration_output_length, 
+                    max_new_tokens=self.max_calibration_output_length, 
                     return_dict_in_generate=True, 
                     output_scores=True, 
-                    early_stopping=True
                 )
                 transition_scores = self.model.compute_transition_scores(
                     output.sequences, 
@@ -97,17 +107,20 @@ class Calibrator(ConformerBase):
         result = SWRResult()
         result.S = self.samples_per_prompt
         C_set = []
-
         group_conf_idx = self.func_lambda_map[self.group_confidence_function.__name__]
         for i in range(self.samples_per_prompt):
             y_k = self.calib_store[prompt][i]
+            break_loop = False
             for reject_func in self.rejection_functions:
                 lambda_idx = self.func_lambda_map[reject_func.__name__]
                 try:
                     if reject_func(x=prompt, y=y_k, c=C_set, l=lambda_vector[lambda_idx]):
+                        break_loop = True
                         break
                 except TypeError:
                     raise TypeError(f"Quality estimator function {reject_func.__name__} must take the form f(x, y, c, lambda)")
+            if break_loop:
+                continue
             if result.S_star < 0:
                 result.S_star = i + 1
             C_set.append(y_k)

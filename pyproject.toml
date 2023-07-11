@@ -6,7 +6,7 @@ authors = ["Bradley-Butcher <bradleydpbutcher@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.8,<3.13"
 torch = "^2.0.1"
 transformers = "^4.30.2"
 scipy = "^1.11.1"

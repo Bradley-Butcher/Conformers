@@ -3,10 +3,12 @@ from conformer.components.shared import ComponentBase
 from random import random
 
 def rouge_1_score(x: str, c: list, target: dict, threshold: float):
-    reference_tokens = set(c.response_tokens.tolist())
-    target_tokens = set(target.response_tokens.tolist())
+    prompt_len = c.prompt_tokens.size(0)
+    just_response = c.response_tokens[prompt_len:]
+    reference_tokens = set(just_response.tolist())
+    target_tokens = set(target["tokens"].tolist())
     shared_tokens = reference_tokens.intersection(target_tokens)
-    return (len(shared_tokens) / len(reference_tokens)) >= threshold
+    return (len(shared_tokens) / len(target_tokens)) > threshold
 
 
 def random_admission(x, y, c):
