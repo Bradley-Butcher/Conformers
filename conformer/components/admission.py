@@ -8,7 +8,49 @@ def rouge_1_score(x: str, c: list, target: dict, threshold: float):
     reference_tokens = set(just_response.tolist())
     target_tokens = set(target["tokens"].tolist())
     shared_tokens = reference_tokens.intersection(target_tokens)
-    return (len(shared_tokens) / len(target_tokens)) > threshold
+    return (len(shared_tokens) / len(target_tokens)) > threshold    
+
+from typing import List
+from numpy import array
+
+def lcs(x: List[int], y: List[int]) -> int:
+    m = len(x)
+    n = len(y)
+    L = array([[0] * (n + 1) for _ in range(m + 1)])
+
+    for i in range(m + 1):
+        for j in range(n + 1):
+            if i == 0 or j == 0:
+                L[i][j] = 0
+            elif x[i - 1] == y[j - 1]:
+                L[i][j] = L[i - 1][j - 1] + 1
+            else:
+                L[i][j] = max(L[i - 1][j], L[i][j - 1])
+
+    return L[m][n]
+
+def rouge_l_score(x: str, c: list, target: dict, threshold: float) -> float:
+    prompt_len = c.prompt_tokens.size(0)
+    just_response = c.response_tokens[prompt_len:]
+    reference_tokens = just_response.tolist()
+    target_tokens = target["tokens"].tolist()
+
+    lcs_length = lcs(reference_tokens, target_tokens)
+
+    # Prevent division by zero
+    if len(target_tokens) == 0 or len(reference_tokens) == 0:
+        return 0.0
+
+    precision = lcs_length / len(reference_tokens)
+    recall = lcs_length / len(target_tokens)
+
+    # Harmonic mean of precision and recall
+    if precision + recall != 0:
+        rouge_l = 2 * precision * recall / (precision + recall)
+    else:
+        rouge_l = 0.0
+
+    return rouge_l > threshold
 
 
 def random_admission(x, y, c):
@@ -22,3 +64,4 @@ def random_admission(x, y, c):
 class AdmissionFunction(ComponentBase):
     random: callable = random_admission
     rouge_1: callable = rouge_1_score
+    rouge_l: callable = rouge_l_score

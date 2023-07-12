@@ -13,5 +13,12 @@ def bonferroni_correction(p_value: float, n_tests: int) -> float:
     """
     return min(1, n_tests * p_value)
 
+def none_debug(p_value: float, n_tests: int) -> float:
+    """
+    A debug function that does noth
+    """
+    return p_value
+
 class FWERFunction(ComponentBase):
     bonferroni_correction: callable = bonferroni_correction
+    none_debug: callable = none_debug 
