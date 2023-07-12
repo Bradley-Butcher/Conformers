@@ -14,6 +14,11 @@ Please excuse the state of the current code - I'll clean it up I promise!
 - [ ] PyPI package
 - [ ] Experiments
 
+## Changes from the paper
+
+- Sampling is no longer greedy - authors claim to use greedy sampling (default transformer sampling), but this will result in the same output for all samples.
+
+
 ## Installation
 
 No PyPI package is available yet. To install, clone the repository and run

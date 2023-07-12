@@ -17,9 +17,9 @@ class Calibrator(ConformerBase):
         calibration_prompts: List[str],
         calibration_path: Optional[str] = None,
         calibration_targets: Optional[List[str]] = None,
-        max_calibration_input_length: int = 1024,
+        max_calibration_input_length: int = 1536,
         max_calibration_output_length: int = 256,
-        samples_per_prompt: int = 3,
+        samples_per_prompt: int = 5,
         delta: float = 0.05,
         epsilon: float = 0.05,
         rho1: float = 0.5,
@@ -77,27 +77,29 @@ class Calibrator(ConformerBase):
                 x = self.tok_func(prompt).to(self.model.device)
                 output = self.model.generate(
                     **x, 
-                    num_beams=self.samples_per_prompt,
-                    num_return_sequences=self.samples_per_prompt, 
                     max_new_tokens=self.max_calibration_output_length, 
+                    num_return_sequences=self.samples_per_prompt,
                     return_dict_in_generate=True, 
-                    output_scores=True, 
+                    output_scores=True,
+                    do_sample=True, 
+                    top_k=50, 
+                    top_p=0.95, 
                 )
-                transition_scores = self.model.compute_transition_scores(
-                    output.sequences, 
-                    output.scores, 
-                    output.beam_indices, 
-                    normalize_logits=False
-                )
-                precomputed[prompt] = [
-                    CElement(
-                        prompt=prompt,
-                        prompt_tokens=x.input_ids[0].detach().cpu(),
-                        response=self.tokenizer.decode(output.sequences[i], skip_special_tokens=True),
-                        sequence_score=output.sequences_scores[i].detach().cpu(),
-                        transition_scores=transition_scores[i].detach().cpu(),
-                        response_tokens=output.sequences[i].detach().cpu(),
-                    ) for i in range(output.sequences.size(0))]
+                elements = []
+                for i in range(len(output.sequences)):
+                    prompt_n = len(x["input_ids"][0])
+                    scores = tuple([output.scores[j][i].unsqueeze(0) for j in range(len(output.scores))])
+                    transitions = self.model.compute_transition_scores(output.sequences[i][prompt_n:].unsqueeze(0),scores,normalize_logits=True)
+                    transitions = torch.nan_to_num(transitions, neginf=0.0)
+                    elements.append(CElement(
+                            prompt=prompt,
+                            prompt_tokens=x.input_ids[0].detach().cpu(),
+                            response=self.tokenizer.decode(output.sequences[i], skip_special_tokens=True),
+                            sequence_score=transitions.sum().detach().cpu() / transitions.size(1),
+                            transition_scores=transitions.detach().cpu(),
+                            response_tokens=output.sequences[i].detach().cpu(),
+                    ))
+                precomputed[prompt] = elements
         return precomputed
 
     def _sample_with_rejection(self, prompt: str, lambda_vector: torch.Tensor) -> List[dict]:
@@ -140,13 +142,13 @@ class Calibrator(ConformerBase):
         losses = torch.zeros(n)
         for i, prompt in enumerate(self.calibration_prompts):
             C_set = self._sample_with_rejection(prompt, lambda_vector)
-            losses[i] = int(any(self.admission_function(
-                self.calibration_prompts[i], 
-                C_i, 
-                self.calibration_targets[i]) 
-                for C_i in C_set
-                )
-            )
+            # losses[i] = int(any(self.admission_function(self.calibration_prompts[i], C_i, self.calibration_targets[i]) for C_i in C_set))
+            admitted = []
+            for C_i in C_set:
+                if self.admission_function(prompt, C_i, self.calibration_targets[i]):
+                    admitted.append(C_i)
+            if not admitted:
+                losses[i] = 1
         return losses.mean()
 
     def search(self):

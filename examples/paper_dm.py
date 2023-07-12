@@ -8,11 +8,11 @@ from datasets import load_dataset
 
 dataset = load_dataset("cnn_dailymail", "3.0.0")
 
-x = dataset["train"][:5]["article"]
+x = dataset["train"][:100]["article"]
 
 # Append to each x ". Summary: "
 x = [x_i[:] + ". Summary: " for x_i in x]
-y = dataset["train"][:5]["highlights"]
+y = dataset["train"][:100]["highlights"]
 
 model_name = "psmathur/orca_mini_3b"
 model = LlamaForCausalLM.from_pretrained(
