@@ -72,7 +72,6 @@ class Calibrator(ConformerBase):
         logger.info(f"Empirical risk: {e_risk}")
         p_val = self._binomial_pval(e_risk, len(self.calibration_prompts))
         if self.fwer_algorithm(p_val, len(lambda_val)) <= self.delta:
-            breakpoint()
             return True
         else:
             return False
