@@ -11,7 +11,7 @@ dataset = load_dataset("cnn_dailymail", "3.0.0")
 x = dataset["train"][:50]["article"]
 
 # Append to each x ". Summary: "
-x = [x_i[:] + ". Summary: " for x_i in x]
+x = [x_i[:] + ". Write a scientific version of the article, with lots of scientific language: " for x_i in x]
 y = dataset["train"][:50]["highlights"]
 
 model_name = "psmathur/orca_mini_3b"
@@ -26,7 +26,10 @@ calibrator = Calibrator(
     model=model,
     tokenizer=tokenizer,
     calibration_prompts=x,
-    calibration_targets=y
+    calibration_targets=y,
+    # delta=0.2,
+    epsilon=0.3,
+    calibration_path="calibration_store.pkl",
 )
 
 group_conf_lambdas = torch.tensor([0.2, 0.4, 0.6, 0.8, 1])
@@ -34,8 +37,8 @@ nll_rej_lambdas = torch.tensor([0.3, 0.6, 0.9, 1.2, 1.5, 1.8])
 rouge_rej_lambdas = torch.tensor([0.2, 0.4, 0.6, 0.8, 0.9])
 
 calibrator.set_admission_function(
-    func=Components.admission.rouge_l, 
-    threshold=0.025
+    func=Components.admission.ppl_prefix(tokenizer, model, "Scientific Article:"),
+    threshold=0.5
 )
 
 calibrator.set_group_confidence_function(

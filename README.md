@@ -17,6 +17,7 @@ Please excuse the state of the current code - I'll clean it up I promise!
 ## Changes from the paper
 
 - Sampling is no longer greedy - authors claim to use greedy sampling (default transformer sampling), but this will result in the same output for all samples.
+- The selection of the admission function, admission function threshold, and epsilon appears to be very sensitive. In paper the authors select task-dependent admission function thresholds (which I assume they derived experimentally) and try different values of epsilon. In this implementation I will attempt to introduce more generic admission functions.
 
 
 ## Installation

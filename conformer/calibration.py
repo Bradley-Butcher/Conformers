@@ -8,6 +8,7 @@ from loguru import logger
 from tqdm import tqdm
 from conformer.base import *
 from conformer.base import CElement
+import os
 
 class Calibrator(ConformerBase):
     def __init__(
@@ -46,11 +47,14 @@ class Calibrator(ConformerBase):
         
         # Caching: Store lambda results in class instance
         self.lambda_results = ResultStore()
-        if calibration_path:
+        if calibration_path and os.path.exists(calibration_path):
             with open(calibration_path, "rb") as f:
                 self.calib_store = pickle.load(f)
         else:
             self.calib_store = self._precompute_calibration()
+            if calibration_path:
+                with open(calibration_path, "wb") as f:
+                    pickle.dump(self.calib_store, f)
 
     def save_calibration(self, path: str):
         with open(path, "wb") as f:
@@ -65,8 +69,13 @@ class Calibrator(ConformerBase):
 
     def _is_valid(self, lambda_val: torch.tensor) -> bool:
         e_risk = self._empirical_risk(lambda_val)
+        logger.info(f"Empirical risk: {e_risk}")
         p_val = self._binomial_pval(e_risk, len(self.calibration_prompts))
-        return self.fwer_algorithm(p_val, len(lambda_val)) <= self.delta
+        if self.fwer_algorithm(p_val, len(lambda_val)) <= self.delta:
+            breakpoint()
+            return True
+        else:
+            return False
 
     def _precompute_calibration(self) -> List[dict]:
         precomputed = {}

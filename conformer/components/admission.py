@@ -1,4 +1,5 @@
 """A script containing a few preset admission functions."""
+import torch
 from conformer.components.shared import ComponentBase
 from random import random
 
@@ -8,7 +9,20 @@ def rouge_1_score(x: str, c: list, target: dict, threshold: float):
     reference_tokens = set(just_response.tolist())
     target_tokens = set(target["tokens"].tolist())
     shared_tokens = reference_tokens.intersection(target_tokens)
-    return (len(shared_tokens) / len(target_tokens)) > threshold    
+    return (len(shared_tokens) / len(target_tokens)) > threshold
+
+def setup_ppl_prefix(tokenizer, model, prefix: str):
+    def ppl_prefix(x: str, c: list, target: dict, threshold: float):
+        prompt_len = c.prompt.size(0)
+        response = c.response[prompt_len:]
+        inputs = tokenizer(response, return_tensors="pt")
+        inputs_with_prefix = tokenizer(prefix + response, return_tensors="pt")
+        loss = model(**inputs, labels=inputs["input_ids"]).loss
+        loss_with_prefix = model(**inputs_with_prefix, labels=inputs_with_prefix["input_ids"]).loss
+        ppl = torch.exp(loss)
+        ppl_with_prefix = torch.exp(loss_with_prefix)
+        return (ppl / ppl_with_prefix) < threshold
+    return ppl_prefix
 
 from typing import List
 from numpy import array
@@ -65,3 +79,4 @@ class AdmissionFunction(ComponentBase):
     random: callable = random_admission
     rouge_1: callable = rouge_1_score
     rouge_l: callable = rouge_l_score
+    ppl_prefix: callable = setup_ppl_prefix
