@@ -135,19 +135,14 @@ class ConformerBase:
 
     def set_admission_function(
         self, 
-        func: Callable,
-        threshold: Optional[float] = None,
-                               
+        func: Callable,                               
     ) -> None:
         """
         Set the admission function for Conformer.
         """
         if self.admission_function is not None:
             logger.warning("Overwriting admission function.")
-        if threshold is not None:
-            self.admission_function = partial(func, threshold=threshold)
-        else:
-            self.admission_function = func
+        self.admission_function = func
 
     def set_group_confidence_function(self, func: Callable, lambda_vals: torch.tensor) -> None:
         """

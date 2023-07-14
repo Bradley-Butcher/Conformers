@@ -38,7 +38,6 @@ rouge_rej_lambdas = torch.tensor([0.2, 0.4, 0.6, 0.8, 0.9])
 
 calibrator.set_admission_function(
     func=Components.admission.ppl_prefix(tokenizer, model, "Scientific Article:"),
-    threshold=0.5
 )
 
 calibrator.set_group_confidence_function(
