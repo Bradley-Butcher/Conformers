@@ -131,30 +131,27 @@ class Calibrator(ConformerBase):
                     raise TypeError(f"Quality estimator function {reject_func.__name__} must take the form f(x, y, c, lambda)")
             if break_loop:
                 continue
-            if result.S_star < 0:
-                result.S_star = i + 1
             C_set.append(y_k)
             try:
                 if self.group_confidence_function(prompt, C_set, lambda_vector[group_conf_idx]):
-                    result.S = i + 1
                     break
             except TypeError:
                 raise TypeError(f"Group confidence function {self.group_confidence_function.__name__} must take the form f(prompt, C_set, lambda)")
-        result.S = len(C_set)
-        self.lambda_results.add_result(lambda_vector, result)
-        return C_set
+        return C_set, result
 
     def _empirical_risk(self, lambda_vector: torch.Tensor) -> torch.Tensor:
         assert self.admission_function is not None, "Admission function not set."
         n = len(self.calibration_prompts)
         losses = torch.zeros(n)
         for i, prompt in enumerate(self.calibration_prompts):
-            C_set = self._sample_with_rejection(prompt, lambda_vector)
-            # losses[i] = int(any(self.admission_function(self.calibration_prompts[i], C_i, self.calibration_targets[i]) for C_i in C_set))
+            C_set, result = self._sample_with_rejection(prompt, lambda_vector)
             admitted = []
-            for C_i in C_set:
+            for i, C_i in enumerate(C_set):
                 if self.admission_function(prompt, C_i, self.calibration_targets[i]):
                     admitted.append(C_i)
+                    if result.S_star == 0:
+                        result.S_star = i
+            self.lambda_results.add_result(lambda_vector, result)
             if not admitted:
                 losses[i] = 1
         return losses.mean()

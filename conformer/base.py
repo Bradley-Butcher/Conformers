@@ -27,9 +27,9 @@ class SWRResult:
     """
     Data class for holding results of SWR.
     """
-    S: int = -1
-    S_star: int = -1
-    N_C: int = -1
+    S: int = 0
+    S_star: int = 0
+    N_C: int = 0
 
     def get_contribution(self, rho1: float, rho2: float) -> float:
         """
@@ -47,7 +47,7 @@ class ResultStore(dict):
         """
         Compute the score for a specific lambda configuration.
         """
-        return torch.mean([r.get_contribution(rho1, rho2) for r in self[lambda_config]])
+        return torch.mean(torch.tensor([r.get_contribution(rho1, rho2) for r in self[lambda_config]]))
 
     def get_best_lambda(self, rho1: float, rho2: float) -> Tuple[float]:
         """
